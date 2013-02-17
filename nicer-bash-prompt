@@ -1,0 +1,137 @@
+# nicer-bash-prompt:
+#
+# Creates a bash prompt that includes red hostname if production, as well as
+# current git branch, and a shortened current directory (last two directories
+# in $PWD).  Also sets a short window title so it works better with tab-based
+# terminal programs such as Mac Terminal.  Tested on Linux with Mac Terminal
+# ssh'ed in, should work fine with other setups.
+#
+# Requires tput and git.  See CUSTOMIZE comments to configure for your hosts, domains, etc.
+#
+# Generally works well, occasionally has issues with editing after Ctrl/R - if you get this, refresh
+# bash's command line display with Ctrl/L (patches welcome).
+#
+# (C) 2013, RichVel @ github - license is BSD 2-Clause, http://opensource.org/licenses/BSD-2-Clause
+
+# CUSTOMIZE: set to hostname prefixes for your servers
+case "$HOSTNAME" in
+    exampleprod*)    sysmode=PROD;;
+    examplestage*)   sysmode=Stage;;
+    exampletest*)    sysmode=Test;;
+    *)               sysmode=Dev;;
+esac
+
+# ======== History setup - optional ===============
+#
+# If you use this, must be called as part of per-prompt command (see CUSTOMIZE below to enable) - ensure that all terminals
+# have same view of bash history, updated after every command.  Only enable this if you understand that cursor-up
+# will sometimes be surprising on returning to a terminal window!
+# history_sync: After every command, append latest commands to hist file, then clear shell history, and re-read all from file
+history_sync() { 
+    history -a; history -c; history -r; 
+}         
+shopt -s histappend                         # Append rather than overwrite
+
+# ======== Prompt setup ===========================
+#
+# set variable identifying the chroot you work in (used in the prompt below)
+if [ -z "$debian_chroot" ] && [ -r /etc/debian_chroot ]; then
+    debian_chroot=$(cat /etc/debian_chroot)
+fi
+
+# Expand any symbolic links in the specified pathname and convert to absolute path
+function realpath() {
+    f=$@
+    if [ -d "$f" ]; then
+        base=""
+        dir="$f"
+    else
+        base="/$(basename "$f")"
+        dir=$(dirname "$f")
+    fi
+
+    dir=$(cd "$dir" && /bin/pwd)
+    echo "$dir$base"
+}
+
+# Set prompt path to max 2 levels for best compromise of readability and usefulness
+promptpath () {
+    realpwd=$(realpath $PWD)          # Absolute path
+    realhome=$(realpath $HOME)
+
+    # if we are in the home directory, show tilde if possible
+    if echo $realpwd | grep -q "^$realhome"; then
+        path=$(echo $realpwd | sed "s|^$realhome|\~|")
+        if [ "$path" = "~" ] || [ "$(dirname "$path")" = "~" ]; then
+            echo $path
+        else
+            echo $(basename $(dirname "$path"))/$(basename "$path")
+        fi
+        return
+    fi
+
+    path_dir=$(dirname $PWD)
+    # if our parent dir is a top-level directory, don't mangle it
+    if [ $(dirname $path_dir) = "/" ]; then
+        echo $PWD
+    else
+        path_parent=$(basename "$path_dir")
+        path_base=$(basename "$PWD")
+
+        echo $path_parent/$path_base
+    fi
+}
+
+
+# Terminal colours - must use \[ and \] to tell readline about them, so bash line editing works
+inverse="\[$(tput smso)\]"
+uninverse="\[$(tput rmso)\]"
+bold="\[$(tput bold)\]"
+unbold="\[$(tput dim)\]"
+reset="\[$(tput sgr0)\]"
+black="\[$bold$(tput setaf 0)\]"
+red="\[$bold$(tput setaf 1)\]"
+green="\[$bold$(tput setaf 2)\]"
+blue="\[$bold$(tput setaf 4)\]"
+magenta="\[$bold$(tput setaf 5)\]"
+yellow="\[$bold$(tput setaf 3)\]"
+cyan="\[$bold$(tput setaf 6)\]"
+
+# Output bash prompt, run after every command - output of script is PS1 value, with all values expanded
+function bash_prompt() {
+    promptpath=$(promptpath)
+    branch=""
+    git branch >/dev/null 2>&1
+    if [[ $? == 0 ]]; then
+        branch=$(git branch 2>/dev/null | grep '^*' |  cut -d " " -f 2)
+    fi
+
+    host=${HOSTNAME%%.example.com}          # Strip suffix - CUSTOMIZE: set to domain name for your servers
+    specialpart="${USER}@${host}"
+    # Red prompt if production system
+    if [ $sysmode = 'PROD' ]; then
+        specialpart="$inverse$red$specialpart$uninverse"
+    fi
+
+    #  CUSTOMIZE: if not using Debian/Ubuntu (or you never use chroot), use the first version of this line
+    # prompt="$yellow${specialpart} ${branch:+$green[$branch] }$blue${promptpath}\$$black$reset "
+    prompt="${debian_chroot:+($debian_chroot)}$yellow${specialpart} ${branch:+$green[$branch] }$blue${promptpath}\$$black$reset "
+    echo -n "$prompt"
+}
+
+# Functional called every time bash displays the prompt
+function per_prompt_command {
+    # Set the window title if a terminal window (Mac or Linux)
+    case "$TERM" in
+        xterm*|rxvt*)
+            echo -ne "\033]0;["$sysmode"] "${USER}":"$(basename "$PWD")"\007"
+            ;;
+    esac
+    # Do the prompt 
+    PS1="$(bash_prompt)"
+    PS1="$PS1"
+
+    # CUSTOMIZE: Uncomment this if you want to sync history on every prompt, across multiple windows (see above)
+    # history_sync
+}
+export PROMPT_COMMAND=per_prompt_command
