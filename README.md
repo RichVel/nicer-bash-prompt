@@ -2,9 +2,9 @@ nicer-bash-prompt
 =================
 
 Create a nicer bash prompt including red prompt on production hosts, current
-git branch, and the last two directories in $PWD.
+git branch, and the last two directories in $PWD, like this:
 
-Screenshot: ![screenshot of red prompt](http://i.imgur.com/aLbWw3Z.png)
+![screenshot of red prompt](http://i.imgur.com/aLbWw3Z.png)
 
 It's completely driven by hostname so as long as you have a suitable pattern to
 production hostnames (e.g. xyprod01, 02, etc) it will work well, and you can
