@@ -20,6 +20,9 @@ case "$HOSTNAME" in
     exampletest*)    sysmode=Test;;
     *)               sysmode=Dev;;
 esac
+if [ "$SIMULATE_PROD" = "yes" ]; then
+    sysmode=PROD
+fi
 
 # ======== History setup - optional ===============
 #
