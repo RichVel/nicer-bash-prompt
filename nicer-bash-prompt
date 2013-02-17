@@ -119,7 +119,7 @@ function bash_prompt() {
     echo -n "$prompt"
 }
 
-# Functional called every time bash displays the prompt
+# Function called every time bash displays the prompt
 function per_prompt_command {
     # Set the window title if a terminal window (Mac or Linux)
     case "$TERM" in
